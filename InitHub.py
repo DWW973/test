@@ -56,7 +56,17 @@ def save_hubconfig(repo_url):
 
 def update_gitignore():
     gitignore_path = os.path.join(os.getcwd(), ".gitignore")
-    ignore_entries = [".gitignore", ".hubconfig", "PushToHub.exe", "InitHub.exe", "Rollback.exe", "DeleteHub.exe"]
+    
+    ext = ".exe" if sys.platform.startswith("win") else ""
+    
+    ignore_entries = [
+        ".gitignore", 
+        ".hubconfig", 
+        f"PushToHub{ext}", 
+        f"InitHub{ext}", 
+        f"Rollback{ext}", 
+        f"DeleteHub{ext}"
+    ]
     
     if os.path.exists(gitignore_path):
         with open(gitignore_path, 'r', encoding='utf-8') as f:
@@ -136,13 +146,32 @@ def main():
         print(f"\033[91m设置远程仓库失败: {e.stderr}\033[0m")
         sys.exit(1)
     
+    def get_current_branch():
+        try:
+            result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                capture_output=True,
+                text=True,
+                encoding='utf-8',
+                errors='replace',
+                check=True
+            )
+            return result.stdout.strip()
+        except:
+            return "main"
+    
     while True:
         pull_choice = input("是否拉取远程仓库内容? (y/n): ").strip().lower()
         if pull_choice in ['y', 'yes']:
-            print("正在拉取远程仓库内容...")
+            current_branch = get_current_branch()
+            branch = input(f"请输入要拉取的分支名 (默认: {current_branch}): ").strip()
+            if not branch:
+                branch = current_branch
+            
+            print(f"正在拉取远程仓库 {branch} 分支内容...")
             try:
                 result = subprocess.run(
-                    ["git", "pull", "origin", "main"],
+                    ["git", "pull", "origin", branch],
                     capture_output=True,
                     text=True,
                     encoding='utf-8',
@@ -157,8 +186,8 @@ def main():
                 if "would be overwritten by merge" in error_msg:
                     print("\033[93m提示：本地存在未追踪的文件会被覆盖\033[0m")
                     print("请手动处理冲突文件后再拉取，或运行以下命令:")
-                    print("  git stash")
-                    print("  git pull origin main")
+                    print(f"  git stash")
+                    print(f"  git pull origin {branch}")
                     print("  git stash pop")
                 elif "not found in upstream" in error_msg or "couldn't find remote ref" in error_msg:
                     print("\033[93m提示：远程分支不存在\033[0m")
